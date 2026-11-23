@@ -1,3 +1,7 @@
+# Verification for 0.2.0
+
+The IBus integration check starts a real input context, presses Ctrl and Shift, observes composing text at the caret, releases the keys, and verifies a single transcript commit using a local HTTP provider. It also exercises cancellation by another key and by focus loss. A codec test measures nonzero live levels from a generated tone while encoding the upload. GTK tests cover testing a newly entered key before saving. HTTP tests check the Groq request path, authorization header, and redacted 403 response. These tests run with synthetic audio and test credentials.
+
 # Verification for 0.1.0
 
 The Debian package was built and extracted on a Debian Linux host. Its launcher and packaged Python modules ran in isolated desktop sessions. The following checks completed against this build.

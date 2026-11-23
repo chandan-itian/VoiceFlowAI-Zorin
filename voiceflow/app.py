@@ -48,22 +48,11 @@ def background(work, done):
 
 
 def install_shortcuts():
-    schema = "org.gnome.settings-daemon.plugins.media-keys"
-    source = Gio.SettingsSchemaSource.get_default()
-    if not source or not source.lookup(schema, True):
-        raise RuntimeError("Use Keyboard Settings to bind voiceflow-zorin --toggle and --cancel.")
-    settings = Gio.Settings.new(schema)
-    paths = list(settings.get_strv("custom-keybindings"))
-    for action, binding in (("toggle", "<Super><Shift>space"), ("cancel", "<Super><Shift>Escape")):
-        path = "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/voiceflow-" + action + "/"
-        item = Gio.Settings.new_with_path(schema + ".custom-keybinding", path)
-        item.set_string("name", "VoiceFlow AI " + action)
-        item.set_string("command", "voiceflow-zorin --" + action)
-        item.set_string("binding", binding)
-        if path not in paths:
-            paths.append(path)
-    if not settings.set_strv("custom-keybindings", paths):
-        raise RuntimeError("The desktop could not save the shortcuts.")
+    settings = Gio.Settings.new("org.gnome.desktop.input-sources")
+    sources = settings.get_value("sources").unpack()
+    source = ("ibus", "voiceflow-zorin")
+    if source not in sources and not settings.set_value("sources", GLib.Variant("a(ss)", sources + [source])):
+        raise RuntimeError("Enable VoiceFlow AI in Keyboard Settings → Input Sources.")
     Gio.Settings.sync()
 
 
@@ -133,8 +122,8 @@ class Preferences(Gtk.Dialog):
         accounts.add(button("Save key to desktop keyring", self.save_key))
         accounts.add(button("Test connection", self.test_connection))
         accounts.add(label("Global shortcuts"))
-        accounts.add(label("Super + Shift + Space toggles dictation. Super + Shift + Esc cancels a recording."))
-        accounts.add(button("Register shortcuts in GNOME Settings", self.shortcuts))
+        accounts.add(label("Select the VoiceFlow AI input source, then hold Ctrl + Shift to speak. Release either key to insert."))
+        accounts.add(button("Enable VoiceFlow AI input source", self.shortcuts))
         self.get_content_area().pack_start(self.message, False, True, 8)
         self.show_all()
 
@@ -146,14 +135,17 @@ class Preferences(Gtk.Dialog):
         if not value:
             self.message.set_text("Enter a key first.")
             return
-        self.secret.set_text("")
-        background(lambda: system.credential(provider, config, value),
-                   lambda _, err: self.message.set_text(err or "API key saved."))
+        def saved(_, err):
+            if self.who.get_active_id() == provider and self.secret.get_text().strip() == value and not err:
+                self.secret.set_text("")
+            self.message.set_text(err or "API key saved.")
+        background(lambda: system.credential(provider, config, value), saved)
 
     def test_connection(self, _):
         provider, config = self.who.get_active_id(), self.credentials_config()
-        self.message.set_text("Checking model list…")
-        background(lambda: cloud.fetch_models(provider, config, system.credential(provider, config)),
+        entered = self.secret.get_text().strip()
+        self.message.set_text(f"Checking {provider} model list…")
+        background(lambda: cloud.fetch_models(provider, config, entered or system.credential(provider, config)),
                    lambda values, err: self.message.set_text(err or f"Connected · {len(values)} models listed."))
 
     def fetch(self, stage):
@@ -182,7 +174,7 @@ class Preferences(Gtk.Dialog):
     def shortcuts(self, _):
         try:
             install_shortcuts()
-            self.message.set_text("Shortcuts registered. You can edit them in Keyboard Settings.")
+            self.message.set_text("Use Super + Space to select VoiceFlow AI. If missing, sign out and back in.")
         except Exception as exc:
             self.message.set_text(str(exc))
 
@@ -372,17 +364,7 @@ class VoiceFlow(Gtk.Application):
         self.notice("Transcribing…")
         self.refresh()
         config, path, proc = self.config.copy(), self.path, self.proc
-        def process():
-            system.finish(proc)
-            raw = cloud.transcribe(config, path, system.credential(config["speech_provider"], config))
-            if not config["refine"]:
-                return raw, raw, ""
-            try:
-                output, model = cloud.refine(config, raw, system.credential(config["text_provider"], config))
-                return raw, output, "Formatted with " + model
-            except Exception as exc:
-                return raw, raw, "Using original transcript · " + str(exc)
-        background(process, self.completed)
+        background(lambda: system.process(config, path, proc), self.completed)
 
     def completed(self, result, failure):
         self.clear()

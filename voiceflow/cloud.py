@@ -25,8 +25,8 @@ DICTATION = "Treat the input as dictation. Preserve meaning and word order. Do n
 
 
 class ApiError(Exception):
-    def __init__(self, status):
-        super().__init__(f"Provider returned HTTP {status}")
+    def __init__(self, status, detail=""):
+        super().__init__(f"Provider returned HTTP {status}" + (" · " + detail if detail else ""))
         self.status = status
 
 
@@ -47,7 +47,7 @@ def endpoint(provider, config):
 
 
 def call(url, key, data=None, content_type="application/json", gemini=False):
-    headers = {"Accept": "application/json", "Content-Type": content_type}
+    headers = {"User-Agent": "VoiceFlowAI-Zorin/0.2.0", "Accept": "application/json", "Content-Type": content_type}
     if key:
         headers.update({"x-goog-api-key": key} if gemini else {"Authorization": "Bearer " + key})
     req = request.Request(url, headers=headers, data=data)
@@ -55,8 +55,20 @@ def call(url, key, data=None, content_type="application/json", gemini=False):
         with request.build_opener(NoRedirect()).open(req, timeout=60) as response:
             return json.load(response)
     except error.HTTPError as exc:
-        exc.close()
-        raise ApiError(exc.code) from None
+        with exc:
+            body = exc.read(8192)
+        detail = ""
+        try:
+            message = json.loads(body)["error"]["message"]
+            if isinstance(message, str):
+                if key:
+                    message = message.replace(key, "[redacted]")
+                detail = " ".join(message.split())[:220]
+        except (ValueError, KeyError, TypeError):
+            pass
+        if exc.code == 403 and not detail:
+            detail = "Access denied. Check the provider account permissions and network access."
+        raise ApiError(exc.code, detail) from None
 
 
 def checked(text):

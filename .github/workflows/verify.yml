@@ -40,6 +40,11 @@ jobs:
             pactl load-module module-null-sink sink_name=dictationtest
             pactl set-default-source dictationtest.monitor
             eval "$(printf test | gnome-keyring-daemon --unlock --components=secrets)"
+            export XDG_CONFIG_HOME=$(mktemp -d)
+            ibus-daemon --daemonize --replace --panel=disable --config=disable --emoji-extension=disable --cache=none
+            for i in $(seq 1 50); do ibus list-engine 2>/dev/null | grep voiceflow-zorin >/dev/null && break; sleep .1; done
+            GTK_IM_MODULE=ibus /usr/bin/python3 tests/ibus_check.py
+            ibus exit
             VF_BROWSER=google-chrome VF_WRITER=libreoffice /usr/bin/python3 tests/desktop_check.py
           '
       - name: Wayland GTK smoke and copy fallback

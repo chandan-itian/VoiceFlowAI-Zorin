@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component>
+  <name>org.freedesktop.IBus.VoiceFlow</name>
+  <description>VoiceFlow AI dictation</description>
+  <exec>/usr/lib/voiceflow-zorin/voiceflow-ibus</exec>
+  <version>0.2.0</version>
+  <author>VoiceFlow AI contributors</author>
+  <license>Apache-2.0</license>
+  <engines>
+    <engine>
+      <name>voiceflow-zorin</name>
+      <longname>VoiceFlow AI</longname>
+      <description>Hold Ctrl + Shift to dictate</description>
+      <language>en</language>
+      <license>Apache-2.0</license>
+      <author>VoiceFlow AI contributors</author>
+      <layout>default</layout>
+      <icon>/usr/share/icons/hicolor/512x512/apps/voiceflow-zorin.png</icon>
+      <symbol>🎙</symbol>
+    </engine>
+  </engines>
+</component>

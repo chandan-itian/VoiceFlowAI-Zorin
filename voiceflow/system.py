@@ -3,7 +3,11 @@ import os
 import subprocess
 import tempfile
 from pathlib import Path
+from . import cloud
 from .cloud import endpoint
+from array import array
+from math import sqrt
+from threading import Thread
 
 DEFAULTS = dict(speech_provider="Groq", speech_model="whisper-large-v3",
                 text_provider="Groq", text_model="llama-3.1-8b-instant", refine=True,
@@ -51,14 +55,28 @@ def credential(provider, config, value=None):
     return key
 
 
-def record(path, source="default", test_source=False):
+def record(path, source="default", test_source=False, meter=None):
     source_args = ["-f", "pulse", "-i", source]
     if test_source:
         source_args = ["-re", "-f", "lavfi", "-i", source]
     codec = ["-c:a", "flac"] if str(path).endswith(".flac") else ["-c:a", "aac", "-b:a", "24k"]
-    return subprocess.Popen(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", *source_args,
-                             "-t", "300", "-ac", "1", "-ar", "16000", *codec, str(path)],
-                            stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    args = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", *source_args,
+            "-t", "300", "-ac", "1", "-ar", "16000", *codec, str(path)]
+    if meter:
+        args += ["-t", "300", "-ac", "1", "-ar", "8000", "-f", "s16le", "pipe:1"]
+    proc = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE if meter else subprocess.DEVNULL,
+                            stderr=subprocess.PIPE)
+    if meter:
+        stream = proc.stdout
+        proc.stdout = None  # The meter thread owns this pipe, including during communicate().
+        def read_levels():
+            with stream:
+                while data := stream.read(800):
+                    samples = array("h", data[:len(data) // 2 * 2])
+                    if samples:
+                        meter(sqrt(sum(x*x for x in samples) / len(samples)) / 32768)
+        Thread(target=read_levels, daemon=True).start()
+    return proc
 
 
 def finish(proc):
@@ -95,3 +113,15 @@ def paste(target):
                               timeout=2).returncode == 0
     except (OSError, subprocess.SubprocessError):
         return False
+
+
+def process(config, path, proc):
+    finish(proc)
+    raw = cloud.transcribe(config, path, credential(config["speech_provider"], config))
+    if not config["refine"]:
+        return raw, raw, ""
+    try:
+        output, model = cloud.refine(config, raw, credential(config["text_provider"], config))
+        return raw, output, "Formatted with " + model
+    except Exception as exc:
+        return raw, raw, "Using original transcript · " + str(exc)

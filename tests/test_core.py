@@ -38,9 +38,11 @@ class TestDictation(unittest.TestCase):
         self.audio = Path(self.tmp.name) / "speech.m4a"
 
     def test_capture_upload_and_refine(self):
-        proc = system.record(self.audio, "sine=frequency=330", True)
+        levels = []
+        proc = system.record(self.audio, "sine=frequency=330", True, meter=levels.append)
         time.sleep(0.9)
         system.finish(proc)
+        self.assertGreater(max(levels), .05)
         streams = json.loads(subprocess.check_output(["ffprobe", "-v", "error", "-show_streams", "-of", "json", self.audio]))
         self.assertEqual(("aac","16000",1), tuple(streams["streams"][0][k] for k in ("codec_name","sample_rate","channels")))
         self.cfg.update(speech_provider="Custom", text_provider="Custom")
@@ -62,6 +64,16 @@ class TestDictation(unittest.TestCase):
             with self.assertRaises(cloud.ApiError):
                 cloud.refine(self.cfg,"original","wrong")
             self.assertEqual(len(self.calls),4)
+
+    def test_groq_connection_denied(self):
+        with patch.dict(cloud.PROVIDERS, Groq=(self.base + "/openai/v1", [], [])):
+            self.responses.append((403, {"error": {"message": "Denied for supplied-key"}}))
+            with self.assertRaisesRegex(cloud.ApiError, r"403 .*Denied for \[redacted\]"):
+                cloud.fetch_models("Groq", self.cfg, "supplied-key")
+            path, headers, _ = self.calls[0]
+            self.assertEqual(path, "/openai/v1/models")
+            self.assertEqual(headers["Authorization"], "Bearer supplied-key")
+            self.assertIn("VoiceFlowAI", headers["User-Agent"])
 
     def test_gemini_audio_and_listing(self):
         self.cfg.update(speech_provider="Gemini",speech_model="gemini-test")
