@@ -18,5 +18,6 @@ pactl load-module module-null-sink sink_name=voiceflow
 pactl set-default-sink voiceflow
 pactl set-default-source voiceflow.monitor
 eval "$(printf test | gnome-keyring-daemon --unlock --components=secrets)"
+gsettings set org.gnome.desktop.input-sources sources "[('ibus', 'voiceflow-zorin')]"
 xdotool key Escape
 VF_HOLD_KEYS="ctrl Super_L" /usr/bin/python3 tests/ibus_check.py

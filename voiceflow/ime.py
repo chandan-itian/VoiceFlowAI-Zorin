@@ -27,6 +27,7 @@ class DictationEngine(IBus.EngineSimple):
     active = None
     shell_capture = False
     connection = None
+    shell_owner = None
     __gtype_name__ = "VoiceFlowDictationEngine"
 
     def __init__(self, **kwargs):
@@ -94,7 +95,9 @@ class DictationEngine(IBus.EngineSimple):
             self.shell_capture = False
 
     def emit_level(self, level):
-        self.connection.emit_signal(None, PATH, SERVICE, "Level", GLib.Variant("(d)", (level,)))
+        if not self.shell_owner:
+            return
+        self.connection.emit_signal(self.shell_owner, PATH, SERVICE, "Level", GLib.Variant("(d)", (level,)))
 
     def wave(self, value):
         self.update_preedit_text(IBus.Text.new_from_string(value), 0, bool(value))
@@ -105,6 +108,10 @@ class DictationEngine(IBus.EngineSimple):
     def do_process_key_event(self, key, code, state):
         modifier = key in CTRL or key in SHIFT
         release = bool(state & MOD.RELEASE_MASK)
+        if self.shell_capture:
+            if not modifier and key not in (IBus.KEY_Super_L, IBus.KEY_Super_R) and not release:
+                self.reset_capture()
+            return IBus.EngineSimple.do_process_key_event(self, key, code, state)
         if key == IBus.KEY_F8 and self.focused and not self.private:
             if self.f8_down:
                 if release:
@@ -205,7 +212,23 @@ def main():
     bus.request_name("org.freedesktop.IBus.VoiceFlow", 0)
     connection = Gio.bus_get_sync(Gio.BusType.SESSION, None)
     DictationEngine.connection = connection
+    def shell_appeared(_, name, owner):
+        DictationEngine.shell_owner = owner
+
+    def shell_vanished(_, name):
+        DictationEngine.shell_owner = None
+        engine = DictationEngine.active
+        if engine and engine.shell_capture:
+            engine.reset_capture()
+
+    Gio.bus_watch_name_on_connection(connection, "org.gnome.Shell", Gio.BusNameWatcherFlags.NONE,
+                                     shell_appeared, shell_vanished)
+
     def control(_, sender, path, interface, method, args, invocation):
+        if sender != DictationEngine.shell_owner:
+            invocation.return_dbus_error("org.freedesktop.DBus.Error.AccessDenied",
+                                         "This shortcut is owned by GNOME Shell.")
+            return
         engine = DictationEngine.active
         ok = False
         if engine and engine.focused and not engine.private:

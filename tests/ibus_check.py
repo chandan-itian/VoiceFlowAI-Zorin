@@ -9,7 +9,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import gi
 gi.require_version("IBus", "1.0")
 gi.require_version("Gtk", "3.0")
-from gi.repository import GLib, Gtk, IBus
+from gi.repository import GLib, Gio, Gtk, IBus
 from voiceflow import system
 
 IBus.init()
@@ -95,17 +95,23 @@ def send_keys():
     time.sleep(.6)
     if os.environ.get("VF_CONTROL_BUS"):
         for method in ("Begin", "End"):
-            out = subprocess.check_output(["gdbus", "call", "--session", "--dest",
-                "io.github.chandan_itian.VoiceFlowInput", "--object-path", "/io/github/chandan_itian/VoiceFlowInput",
-                "--method", "io.github.chandan_itian.VoiceFlowInput." + method], text=True)
-            assert "true" in out, out
+            result = control_bus.call_sync("io.github.chandan_itian.VoiceFlowInput",
+                "/io/github/chandan_itian/VoiceFlowInput", "io.github.chandan_itian.VoiceFlowInput",
+                method, None, None, Gio.DBusCallFlags.NONE, 2000, None)
+            assert result.unpack() == (True,)
             if method == "Begin":
                 time.sleep(1.7)
     else:
         keys = os.environ.get("VF_HOLD_KEYS", "F8").split()
+        if count == 2:
+            keys.reverse()
         subprocess.run(["xdotool", *[part for k in keys for part in ("keydown", k)]], check=True)
         time.sleep(1.7)
         subprocess.run(["xdotool", *[part for k in reversed(keys) for part in ("keyup", k)]], check=True)
+if os.environ.get("VF_CONTROL_BUS"):
+    # Stand in for Shell on the isolated Weston test bus.
+    control_bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+    Gio.bus_own_name_on_connection(control_bus, "org.gnome.Shell", Gio.BusNameOwnerFlags.NONE, None, None)
 for count in (1, 2):
     threading.Thread(target=send_keys, daemon=True).start()
     until(lambda: entry.get_text() == "Before " + "Mujhe knowledge hai." * count + " after", 12)
