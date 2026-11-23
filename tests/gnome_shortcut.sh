@@ -24,6 +24,7 @@ xdotool key Escape
 win=$(xdotool search --onlyvisible --name '^VoiceFlow AI$' | head -1)
 xdotool windowactivate --sync "$win"
 gsettings get org.gnome.settings-daemon.plugins.media-keys custom-keybindings
+gsettings get org.gnome.desktop.wm.keybindings switch-input-source-backward
 sleep 1
 xdotool key Super_L+Shift_L+space
 for i in $(seq 1 60); do xdotool search --onlyvisible --name '^VoiceFlow recording$' >/dev/null && break; sleep .2; done

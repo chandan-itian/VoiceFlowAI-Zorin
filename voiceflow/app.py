@@ -3,6 +3,7 @@ import os
 import sys
 import tempfile
 import threading
+import time
 from pathlib import Path
 
 import gi
@@ -71,6 +72,14 @@ def install_toggle():
     if previous != keep and not wm.set_strv("switch-input-source-backward", keep):
         raise RuntimeError("Keyboard Settings reserves this shortcut for the previous input source.")
     Gio.Settings.sync()
+    paths = list(settings.get_strv("custom-keybindings"))
+    if path in paths:
+        if not settings.set_strv("custom-keybindings", [v for v in paths if v != path]):
+            raise RuntimeError("Unable to refresh the desktop shortcut.")
+        Gio.Settings.sync()
+    # Mutter and the media-keys daemon observe dconf in separate processes.
+    # Allow the old grab to drain before requesting the replacement.
+    time.sleep(1)
     for key, value in (("name", "VoiceFlow AI dictation"), ("command", "voiceflow-zorin --toggle"),
                        ("binding", binding)):
         if not item.set_string(key, value):
@@ -178,12 +187,13 @@ class Preferences(Gtk.Dialog):
         self.get_content_area().pack_start(self.message, False, True, 8)
         self.show_all()
 
-    def enable_toggle(self, _):
-        try:
-            install_toggle()
-            self.message.set_text("Super + Shift + Space starts or finishes recording.")
-        except Exception as exc:
-            self.message.set_text(str(exc))
+    def enable_toggle(self, widget):
+        widget.set_sensitive(False)
+        self.message.set_text("Registering the desktop shortcut…")
+        def done(_, err):
+            widget.set_sensitive(True)
+            self.message.set_text(err or "Super + Shift + Space starts or finishes recording.")
+        background(install_toggle, done)
 
     def credentials_config(self):
         return self.config | {"custom_url": self.url.get_text().strip()}
