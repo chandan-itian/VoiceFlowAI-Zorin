@@ -4,6 +4,7 @@ import json
 import subprocess
 import threading
 import time
+import tempfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import gi
@@ -39,9 +40,29 @@ def until(check, timeout=10):
     raise AssertionError(f"IBus timeout: waves={waves[-3:]}, commits={commits}, errors={errors}, calls={calls}")
 
 
+browser_ready = threading.Event()
+browser_values = []
+
 class Provider(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"""<input type=search id=q value='Before  after' autofocus>
+        <script>const q=document.querySelector('input'); q.focus(); q.setSelectionRange(7,7);
+        const t=setInterval(()=>{if(document.hasFocus() && document.activeElement===q){
+          clearInterval(t);fetch('/ready',{method:'POST',body:'ok'});}},100);
+        q.oninput=()=>fetch('/value',{method:'POST',body:q.value});</script>""")
+
     def do_POST(self):
         body = self.rfile.read(int(self.headers["Content-Length"]))
+        if self.path in ("/ready", "/value"):
+            if self.path == "/ready":
+                browser_ready.set()
+            else:
+                browser_values.append(body.decode())
+            self.send_response(204)
+            self.end_headers()
+            return
         assert b"ftyp" in body
         calls.append(self.path)
         self.send_response(200)
@@ -116,6 +137,20 @@ for count in (1, 2):
     threading.Thread(target=send_keys, daemon=True).start()
     until(lambda: entry.get_text() == "Before " + "Mujhe knowledge hai." * count + " after", 12)
 print("PASS: repeated commits into GTK editor:", entry.get_text())
+
+if os.environ.get("VF_WAYLAND_BROWSER"):
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as profile:
+        chrome = subprocess.Popen([os.environ["VF_WAYLAND_BROWSER"], "--ozone-platform=wayland",
+            "--enable-wayland-ime", "--wayland-text-input-version=3", "--disable-gpu", "--no-first-run",
+            "--user-data-dir=" + profile, f"http://127.0.0.1:{server.server_port}/editor"])
+        try:
+            until(browser_ready.is_set, 20)
+            threading.Thread(target=send_keys, daemon=True).start()
+            until(lambda: "Before Mujhe knowledge hai. after" in browser_values, 15)
+            print("PASS: Wayland Chromium search field retained surrounding text")
+        finally:
+            chrome.terminate()
+            chrome.wait(timeout=10)
 
 tone.terminate()
 tone.wait(timeout=5)

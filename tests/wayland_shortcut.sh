@@ -20,4 +20,4 @@ pactl set-default-source voiceflow.monitor
 eval "$(printf test | gnome-keyring-daemon --unlock --components=secrets)"
 gsettings set org.gnome.desktop.input-sources sources "[('ibus', 'voiceflow-zorin')]"
 xdotool key Escape
-VF_HOLD_KEYS="ctrl Super_L" /usr/bin/python3 tests/ibus_check.py
+VF_WAYLAND_BROWSER=google-chrome VF_HOLD_KEYS="ctrl Super_L" /usr/bin/python3 tests/ibus_check.py
