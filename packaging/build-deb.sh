@@ -9,7 +9,7 @@ chmod 755 "$root"
 install -Dm755 packaging/voiceflow-zorin "$root/usr/bin/voiceflow-zorin"
 install -m644 voiceflow/*.py "$root/usr/lib/voiceflow-zorin/voiceflow/"
 install -Dm644 assets/voiceflow-zorin.png "$root/usr/share/icons/hicolor/512x512/apps/voiceflow-zorin.png"
-install -Dm644 packaging/voiceflow-zorin.desktop "$root/usr/share/applications/voiceflow-zorin.desktop"
+install -Dm644 packaging/voiceflow-zorin.desktop "$root/usr/share/applications/io.github.chandan_itian.VoiceFlowAI.desktop"
 install -Dm644 LICENSE "$root/usr/share/doc/voiceflow-zorin/copyright"
 cat > "$root/DEBIAN/control" <<'CONTROL'
 Package: voiceflow-zorin

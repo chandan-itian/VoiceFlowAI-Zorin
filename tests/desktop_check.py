@@ -33,6 +33,12 @@ with tempfile.TemporaryDirectory() as tmp:
     raw, polished = "mujhe नॉलेज hai", "Mujhe knowledge hai."
     calls = []
     class API(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(b'<title>VF browser fixture</title><textarea autofocus oninput="document.title=this.value"></textarea>')
+
         def do_POST(self):
             body = self.rfile.read(int(self.headers["Content-Length"]))
             calls.append((self.path, body))
@@ -64,6 +70,7 @@ w.show_all()
 e.grab_focus()
 Gtk.main()
 """, str(target_file)])
+    others = []
     app = subprocess.Popen(["voiceflow-zorin"])
     try:
         wait(lambda: run("xdotool","search","--onlyvisible","--name","^VoiceFlow AI$"))
@@ -81,9 +88,47 @@ Gtk.main()
         assert b"ftyp" in calls[0][1]
         assert json.loads(calls[1][1])["messages"][1]["content"] == raw
         print("PASS: packaged app, keyring, cancel, PulseAudio capture, M4A upload, refinement and X11 insertion")
+        def dictate_into(window_name):
+            wait(lambda: run("xdotool", "search", "--onlyvisible", "--name", window_name))
+            wid = run("xdotool", "search", "--onlyvisible", "--name", window_name).splitlines()[-1]
+            run("xdotool", "windowactivate", "--sync", wid)
+            run("voiceflow-zorin", "--toggle")
+            time.sleep(1.0)
+            run("voiceflow-zorin", "--toggle")
+            return wid
+
+        if os.environ.get("VF_BROWSER"):
+            page = config["custom_url"] + "/editor"
+            others.append(subprocess.Popen([os.environ["VF_BROWSER"], "--no-first-run", "--disable-sync",
+                "--user-data-dir=" + tmp + "/browser", "--new-window", page]))
+            win = dictate_into("VF browser fixture")
+            wait(lambda: polished in run("xdotool", "getwindowname", win))
+            print("PASS: dictation inserted into browser textarea")
+
+        if os.environ.get("VF_WRITER"):
+            document = Path(tmp) / "VoiceFlow-Writer-check.txt"
+            document.write_text("Start ")
+            others.append(subprocess.Popen([os.environ["VF_WRITER"], "-env:UserInstallation=" +
+                (Path(tmp) / "office").as_uri(), "--norestore", "--writer", str(document)]))
+            win = dictate_into("VoiceFlow-Writer-check")
+            wait(lambda: len(calls) >= (6 if os.environ.get("VF_BROWSER") else 4))
+            # Read back Writer's selected document text via the X11 selection.
+            import gi
+            gi.require_version("Gtk", "3.0")
+            gi.require_version("Gdk", "3.0")
+            from gi.repository import Gtk, Gdk
+            clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
+            def inserted():
+                run("xdotool", "key", "ctrl+a", "ctrl+c")
+                value = clipboard.wait_for_text() or ""
+                return polished in value and "Start" in value
+            wait(inserted)
+            print("PASS: dictation inserted into LibreOffice Writer")
         run("voiceflow-zorin","--quit")
         assert app.wait(timeout=5) == 0
     finally:
+        for process in others:
+            process.terminate()
         target.terminate()
         target.wait()
         if app.poll() is None:

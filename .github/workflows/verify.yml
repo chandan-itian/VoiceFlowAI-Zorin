@@ -17,7 +17,7 @@ jobs:
         run: |
           ./packaging/build-deb.sh
           sudo apt-get update -qq
-          sudo apt-get install -y ./dist/*.deb xvfb openbox pulseaudio dbus-x11 gnome-keyring weston
+          sudo apt-get install -y ./dist/*.deb xvfb openbox pulseaudio dbus-x11 gnome-keyring weston libreoffice-writer
           test -s /usr/share/icons/hicolor/512x512/apps/voiceflow-zorin.png
       - name: Provider, codec and configuration tests
         run: /usr/bin/python3 -m unittest discover -s tests -v
@@ -31,7 +31,7 @@ jobs:
             pactl load-module module-null-sink sink_name=dictationtest
             pactl set-default-source dictationtest.monitor
             eval "$(printf test | gnome-keyring-daemon --unlock --components=secrets)"
-            /usr/bin/python3 tests/desktop_check.py
+            VF_BROWSER=google-chrome VF_WRITER=libreoffice /usr/bin/python3 tests/desktop_check.py
           '
       - name: Wayland GTK smoke and copy fallback
         run: |

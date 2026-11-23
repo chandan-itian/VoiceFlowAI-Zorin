@@ -89,6 +89,8 @@ def paste(target):
     try:
         kind = subprocess.check_output(["xprop", "-id", target, "WM_CLASS"], text=True, timeout=2).lower()
         terminal = any(t in kind for t in ("terminal", "tilix", "kitty", "alacritty", "konsole", "wezterm"))
+        if x11_target() != target:
+            return False
         return subprocess.run(["xdotool", "key", "--clearmodifiers", "ctrl+shift+v" if terminal else "ctrl+v"],
                               timeout=2).returncode == 0
     except (OSError, subprocess.SubprocessError):
