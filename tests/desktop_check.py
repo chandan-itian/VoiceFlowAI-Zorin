@@ -78,8 +78,11 @@ Gtk.main()
         editor = run("xdotool","search","--name","^VoiceFlow test editor$").splitlines()[0]
         run("xdotool","windowactivate","--sync",editor)
         run("voiceflow-zorin","--toggle")
+        wait(lambda: run("xdotool","search","--onlyvisible","--name","^VoiceFlow recording$"))
+        assert run("xdotool","getactivewindow") == editor
         time.sleep(1)
         run("voiceflow-zorin","--cancel")
+        assert subprocess.run(["xdotool","search","--onlyvisible","--name","^VoiceFlow recording$"]).returncode == 1
         assert not calls
         run("voiceflow-zorin","--toggle")
         time.sleep(1.2)

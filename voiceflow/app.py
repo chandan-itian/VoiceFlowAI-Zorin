@@ -1,3 +1,4 @@
+from collections import deque
 import os
 import sys
 import tempfile
@@ -54,6 +55,50 @@ def install_shortcuts():
     if source not in sources and not settings.set_value("sources", GLib.Variant("a(ss)", sources + [source])):
         raise RuntimeError("Enable VoiceFlow AI in Keyboard Settings → Input Sources.")
     Gio.Settings.sync()
+
+
+def install_toggle():
+    binding = "<Super><Shift>space"
+    schema = "org.gnome.settings-daemon.plugins.media-keys"
+    settings = Gio.Settings.new(schema)
+    path = "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/voiceflow-toggle/"
+    item = Gio.Settings.new_with_path(schema + ".custom-keybinding", path)
+    for key, value in (("name", "VoiceFlow AI dictation"), ("command", "voiceflow-zorin --toggle"),
+                       ("binding", binding)):
+        if not item.set_string(key, value):
+            raise RuntimeError("Keyboard shortcut settings are locked.")
+    paths = list(settings.get_strv("custom-keybindings"))
+    if path not in paths and not settings.set_strv("custom-keybindings", paths + [path]):
+        raise RuntimeError("Unable to register the desktop shortcut.")
+    wm = Gio.Settings.new("org.gnome.desktop.wm.keybindings")
+    previous = wm.get_strv("switch-input-source-backward")
+    keep = [v for v in previous if Gtk.accelerator_parse(v) != Gtk.accelerator_parse(binding)]
+    if previous != keep and not wm.set_strv("switch-input-source-backward", keep):
+        raise RuntimeError("Keyboard Settings reserves this shortcut for the previous input source.")
+    Gio.Settings.sync()
+
+
+class RecordingIndicator(Gtk.Window):
+    def __init__(self):
+        super().__init__(title="VoiceFlow recording")
+        self.set_decorated(False)
+        self.set_resizable(False)
+        self.set_accept_focus(False)
+        self.set_focus_on_map(False)
+        self.set_keep_above(True)
+        self.set_skip_taskbar_hint(True)
+        self.set_skip_pager_hint(True)
+        self.set_type_hint(Gdk.WindowTypeHint.NOTIFICATION)
+        self.set_position(Gtk.WindowPosition.MOUSE)
+        self.set_border_width(10)
+        self.bars = deque("▁" * 14, maxlen=14)
+        self.caption = Gtk.Label()
+        self.add(self.caption)
+        self.update_level(0)
+
+    def update_level(self, level):
+        self.bars.append("▁▂▃▄▅▆▇█"[min(7, int(level ** 0.5 * 18))])
+        self.caption.set_markup('<span foreground="#35ae86">●</span>  <tt>' + "".join(self.bars) + "</tt>")
 
 
 class Preferences(Gtk.Dialog):
@@ -125,8 +170,17 @@ class Preferences(Gtk.Dialog):
         accounts.add(label("Global shortcuts"))
         accounts.add(label("Select the VoiceFlow AI input source, then hold Ctrl + Shift to speak. Release either key to insert."))
         accounts.add(button("Enable VoiceFlow AI input source", self.shortcuts))
+        accounts.add(label("The toggle shortcut replaces GNOME’s previous input source shortcut. Super + Space still switches sources."))
+        accounts.add(button("Enable Super + Shift + Space dictation", self.enable_toggle))
         self.get_content_area().pack_start(self.message, False, True, 8)
         self.show_all()
+
+    def enable_toggle(self, _):
+        try:
+            install_toggle()
+            self.message.set_text("Super + Shift + Space starts or finishes recording.")
+        except Exception as exc:
+            self.message.set_text(str(exc))
 
     def credentials_config(self):
         return self.config | {"custom_url": self.url.get_text().strip()}
@@ -204,6 +258,7 @@ class VoiceFlow(Gtk.Application):
         self.proc = None
         self.temp = None
         self.dlg = None
+        self.indicator = None
         self.target = None
         self.config = system.load()
 
@@ -326,7 +381,8 @@ class VoiceFlow(Gtk.Application):
         suffix = ".flac" if self.config["speech_provider"] == "Gemini" else ".m4a"
         self.path = Path(self.temp.name) / ("recording" + suffix)
         try:
-            self.proc = system.record(self.path)
+            self.level = deque([0.0], maxlen=1)
+            self.proc = system.record(self.path, meter=self.level.append if global_key else None)
         except Exception as exc:
             self.clear()
             self.notice(str(exc))
@@ -334,12 +390,17 @@ class VoiceFlow(Gtk.Application):
         self.phase = "recording"
         self.notice("Recording · use the shortcut again to finish")
         self.refresh()
-        GLib.timeout_add(250, self.monitor, self.proc)
+        if global_key:
+            self.indicator = RecordingIndicator()
+            self.indicator.show_all()
+        GLib.timeout_add(75 if global_key else 250, self.monitor, self.proc)
 
     def monitor(self, proc):
         if self.proc is not proc or self.phase != "recording":
             return False
         if proc.poll() is None:
+            if self.indicator:
+                self.indicator.update_level(self.level[-1])
             return True
         self.stop()
         return False
@@ -353,7 +414,13 @@ class VoiceFlow(Gtk.Application):
         self.clear()
         self.notice("Recording cancelled")
 
+    def hide_indicator(self):
+        if self.indicator:
+            self.indicator.destroy()
+            self.indicator = None
+
     def clear(self):
+        self.hide_indicator()
         if self.temp:
             self.temp.cleanup()
         self.proc = self.temp = None
@@ -361,6 +428,7 @@ class VoiceFlow(Gtk.Application):
         self.refresh()
 
     def stop(self):
+        self.hide_indicator()
         self.phase = "stopping"
         self.notice("Transcribing…")
         self.refresh()
