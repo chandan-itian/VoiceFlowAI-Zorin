@@ -20,8 +20,8 @@ Section: sound
 Priority: optional
 Architecture: all
 Maintainer: VoiceFlow AI contributors <chandan-itian@users.noreply.github.com>
-Depends: python3 (>= 3.10), python3-gi, ibus, ibus-gtk3, gir1.2-ibus-1.0, gir1.2-gtk-3.0, ffmpeg, libsecret-tools, xdotool, x11-utils
-Recommends: gnome-keyring, gnome-settings-daemon-common
+Depends: python3 (>= 3.10), python3-gi, ibus, ibus-gtk3, gir1.2-ibus-1.0, gir1.2-gtk-3.0, ffmpeg, libsecret-tools, xdotool, x11-utils, gnome-settings-daemon-common
+Recommends: gnome-keyring
 Description: Online desktop dictation with configurable transcription and refinement
  Record speech, transcribe via a cloud provider, and optionally refine the text.
 CONTROL

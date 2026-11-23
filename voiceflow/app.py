@@ -60,6 +60,8 @@ def install_shortcuts():
 def install_toggle():
     binding = "<Super><Shift>space"
     schema = "org.gnome.settings-daemon.plugins.media-keys"
+    if not Gio.SettingsSchemaSource.get_default().lookup(schema, True):
+        raise RuntimeError("Use Keyboard Settings to bind Super + Shift + Space to voiceflow-zorin --toggle.")
     settings = Gio.Settings.new(schema)
     path = "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/voiceflow-toggle/"
     item = Gio.Settings.new_with_path(schema + ".custom-keybinding", path)

@@ -1,7 +1,26 @@
 import os
 from unittest.mock import Mock, patch
-from voiceflow.app import Preferences, VoiceFlow
+from voiceflow.app import Preferences, VoiceFlow, RecordingIndicator, install_toggle
+from gi.repository import Gio, Gtk
 from voiceflow import system
+
+# Keep CI changes to desktop bindings inside this test process.
+os.environ["GSETTINGS_BACKEND"] = "memory"
+install_toggle()
+install_toggle()
+schema = "org.gnome.settings-daemon.plugins.media-keys"
+path = "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/voiceflow-toggle/"
+assert Gio.Settings.new(schema).get_strv("custom-keybindings").count(path) == 1
+item = Gio.Settings.new_with_path(schema + ".custom-keybinding", path)
+assert item.get_string("command") == "voiceflow-zorin --toggle"
+binding = Gtk.accelerator_parse(item.get_string("binding"))
+assert all(Gtk.accelerator_parse(v) != binding for v in
+           Gio.Settings.new("org.gnome.desktop.wm.keybindings").get_strv("switch-input-source-backward"))
+indicator = RecordingIndicator()
+indicator.show_all()
+indicator.update_level(.5)
+assert indicator.get_mapped() and "█" in indicator.caption.get_text()
+indicator.destroy()
 
 app = VoiceFlow()
 assert app.register(None)
