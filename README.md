@@ -4,7 +4,7 @@ Online desktop dictation for Roman Hinglish, Hindi and English. Use one provider
 
 ## Install
 
-Download the Debian package from [Releases](https://github.com/chandan-itian/VoiceFlowAI-Zorin/releases/latest). From the download directory, run:
+Download the **voiceflow-zorin-deb** artifact from a successful [verification run](https://github.com/chandan-itian/VoiceFlowAI-Zorin/actions/workflows/verify.yml). Extract the ZIP, then run this command in the directory containing the package:
 
 ```sh
 sudo apt install ./voiceflow-zorin_0.1.0_all.deb
