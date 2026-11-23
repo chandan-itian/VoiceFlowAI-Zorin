@@ -11,7 +11,7 @@ Online desktop dictation for Roman Hinglish, Hindi and English. Use one provider
 Download [the Debian installer from Releases](https://github.com/chandan-itian/VoiceFlowAI-Zorin/releases/latest). In the directory containing the downloaded package, run:
 
 ```sh
-sudo apt install ./voiceflow-zorin_0.2.1_all.deb
+sudo apt install ./voiceflow-zorin_0.2.2_all.deb
 ```
 
 Open **VoiceFlow AI** from the applications menu. The package targets Zorin OS 17 and 18 and their Ubuntu 22.04 and 24.04 bases. It uses Python 3, GTK 3, FFmpeg and the desktop Secret Service. No local AI model download is required.
@@ -32,7 +32,7 @@ This shortcut works while the VoiceFlow input source is active in apps supportin
 
 | Provider | Audio | Refinement |
 | --- | --- | --- |
-| Groq | Whisper transcription API | Chat completions with configurable 429 fallback |
+| Groq | Whisper transcription API | Chat completions with configurable model fallback |
 | OpenAI | Audio transcription API | Chat completions |
 | Gemini | Native generateContent with FLAC audio | Native generateContent |
 | OpenRouter | | Chat completions |
@@ -40,7 +40,7 @@ This shortcut works while the VoiceFlow input source is active in apps supportin
 
 Model IDs and availability depend on the account. **Fetch** lists candidates and each model field accepts a manual ID. For a custom endpoint, include the API prefix, for example `https://host.example/v1`. HTTPS and loopback HTTP endpoints are supported. Custom keys are scoped to the exact base URL. If the key changes, save its replacement in Providers.
 
-Groq formatting retries the same transcript on 429 using the configured fallback list. The default backups are GPT-OSS 20B and Llama 3.3 70B Versatile. Audio is uploaded once. If refinement fails, the original transcript is available. A transcription error is shown directly.
+Groq formatting retries the same transcript on rate limits or model-specific unavailable/decommissioned errors using the configured fallback list. The default backups are GPT-OSS 20B and Llama 3.3 70B Versatile. Audio is uploaded once. If refinement fails, the original transcript is available. A transcription error is shown directly.
 
 ## Data handling
 

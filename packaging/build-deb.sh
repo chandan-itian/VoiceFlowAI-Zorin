@@ -15,7 +15,7 @@ install -Dm644 packaging/voiceflow-zorin.desktop "$root/usr/share/applications/i
 install -Dm644 LICENSE "$root/usr/share/doc/voiceflow-zorin/copyright"
 cat > "$root/DEBIAN/control" <<'CONTROL'
 Package: voiceflow-zorin
-Version: 0.2.1
+Version: 0.2.2
 Section: sound
 Priority: optional
 Architecture: all
@@ -25,4 +25,4 @@ Recommends: gnome-keyring
 Description: Online desktop dictation with configurable transcription and refinement
  Record speech, transcribe via a cloud provider, and optionally refine the text.
 CONTROL
-dpkg-deb --root-owner-group --build "$root" dist/voiceflow-zorin_0.2.1_all.deb
+dpkg-deb --root-owner-group --build "$root" dist/voiceflow-zorin_0.2.2_all.deb

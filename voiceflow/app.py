@@ -65,6 +65,12 @@ def install_toggle():
     settings = Gio.Settings.new(schema)
     path = "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/voiceflow-toggle/"
     item = Gio.Settings.new_with_path(schema + ".custom-keybinding", path)
+    wm = Gio.Settings.new("org.gnome.desktop.wm.keybindings")
+    previous = wm.get_strv("switch-input-source-backward")
+    keep = [v for v in previous if Gtk.accelerator_parse(v) != Gtk.accelerator_parse(binding)]
+    if previous != keep and not wm.set_strv("switch-input-source-backward", keep):
+        raise RuntimeError("Keyboard Settings reserves this shortcut for the previous input source.")
+    Gio.Settings.sync()
     for key, value in (("name", "VoiceFlow AI dictation"), ("command", "voiceflow-zorin --toggle"),
                        ("binding", binding)):
         if not item.set_string(key, value):
@@ -72,11 +78,6 @@ def install_toggle():
     paths = list(settings.get_strv("custom-keybindings"))
     if path not in paths and not settings.set_strv("custom-keybindings", paths + [path]):
         raise RuntimeError("Unable to register the desktop shortcut.")
-    wm = Gio.Settings.new("org.gnome.desktop.wm.keybindings")
-    previous = wm.get_strv("switch-input-source-backward")
-    keep = [v for v in previous if Gtk.accelerator_parse(v) != Gtk.accelerator_parse(binding)]
-    if previous != keep and not wm.set_strv("switch-input-source-backward", keep):
-        raise RuntimeError("Keyboard Settings reserves this shortcut for the previous input source.")
     Gio.Settings.sync()
 
 
@@ -146,7 +147,7 @@ class Preferences(Gtk.Dialog):
         routing.add(self.lang)
         self.toggles = {}
         for key, title in (("refine", "Refine the transcript"), ("auto_paste", "Paste into the original X11 window"),
-                           ("fallback", "Try fallback models after a Groq formatting rate limit")):
+                           ("fallback", "Try fallback models when a Groq model is unavailable or rate-limited")):
             switch = Gtk.CheckButton.new_with_label(title)
             switch.set_active(config[key])
             routing.add(switch)
@@ -370,21 +371,24 @@ class VoiceFlow(Gtk.Application):
             self.send_notification("dictation", notice)
 
     def toggle(self, global_key=False):
-        if self.dlg:
-            return
         if self.phase == "recording":
             self.stop()
             return
         if self.phase != "idle":
             return
+        # A shortcut can be tried inside the modal settings dialog. Keep its
+        # result in the main window instead of pasting into a settings field.
+        if self.dlg and self.dlg.is_active():
+            global_key = False
         self.target = system.x11_target() if global_key else None
         self.global_key = global_key
         self.temp = tempfile.TemporaryDirectory(prefix="voiceflow-")
+        self.capture_config = self.config.copy()
         suffix = ".flac" if self.config["speech_provider"] == "Gemini" else ".m4a"
         self.path = Path(self.temp.name) / ("recording" + suffix)
         try:
             self.level = deque([0.0], maxlen=1)
-            self.proc = system.record(self.path, meter=self.level.append if global_key else None)
+            self.proc = system.record(self.path, meter=self.level.append)
         except Exception as exc:
             self.clear()
             self.notice(str(exc))
@@ -392,10 +396,11 @@ class VoiceFlow(Gtk.Application):
         self.phase = "recording"
         self.notice("Recording · use the shortcut again to finish")
         self.refresh()
-        if global_key:
-            self.indicator = RecordingIndicator()
-            self.indicator.show_all()
-        GLib.timeout_add(75 if global_key else 250, self.monitor, self.proc)
+        self.indicator = RecordingIndicator()
+        if not global_key:
+            self.indicator.set_transient_for(self.dlg or self.window)
+        self.indicator.show_all()
+        GLib.timeout_add(75, self.monitor, self.proc)
 
     def monitor(self, proc):
         if self.proc is not proc or self.phase != "recording":
@@ -434,7 +439,7 @@ class VoiceFlow(Gtk.Application):
         self.phase = "stopping"
         self.notice("Transcribing…")
         self.refresh()
-        config, path, proc = self.config.copy(), self.path, self.proc
+        config, path, proc = self.capture_config, self.path, self.proc
         background(lambda: system.process(config, path, proc), self.completed)
 
     def completed(self, result, failure):

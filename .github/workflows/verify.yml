@@ -57,6 +57,13 @@ jobs:
             for i in $(seq 1 50); do test -S "$XDG_RUNTIME_DIR/voiceflow-test" && break; sleep .2; done
             WAYLAND_DISPLAY=voiceflow-test GDK_BACKEND=wayland /usr/bin/python3 tests/gui_check.py
           '
+      - name: GNOME Shell global shortcut on Noble
+        if: matrix.os == 'ubuntu-24.04'
+        run: |
+          sudo apt-get install -y --no-install-recommends gnome-shell gnome-settings-daemon
+          export PYTHONPATH=/usr/lib/voiceflow-zorin
+          export XDG_RUNTIME_DIR=$(mktemp -d)
+          dbus-run-session -- xvfb-run -a bash tests/gnome_shortcut.sh
       - uses: actions/upload-artifact@v4
         if: matrix.os == 'ubuntu-24.04'
         with:

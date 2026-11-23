@@ -67,6 +67,26 @@ class TestDictation(unittest.TestCase):
                 cloud.refine(self.cfg,"original","wrong")
             self.assertEqual(len(self.calls),4)
 
+    def test_unavailable_groq_formatter_uses_backups_on_same_transcript(self):
+        with patch.dict(cloud.PROVIDERS, Groq=(self.base, [], [])):
+            self.cfg.update(text_provider="Custom")
+            self.responses.extend([
+                (200, {"text": "sample"}),
+                (404, {"error": {"message": "The model does not exist or you do not have access to it."}}),
+                (404, {"error": {"code": "model_not_found"}}),
+                (200, {"choices": [{"message": {"content": "sample"}}]})])
+            self.assertIn("llama-3.3-70b-versatile", cloud.check_connection("Groq", self.cfg, "demo"))
+            self.assertEqual([p for p, _, _ in self.calls],
+                             ["/audio/transcriptions"] + ["/chat/completions"] * 3)
+
+    def test_route_404_is_not_a_model_failure(self):
+        with patch.dict(cloud.PROVIDERS, Groq=(self.base, [], [])):
+            self.responses.extend([(200, {"text": "sample"}), (404, {"error": {"message": "Unknown route"}})])
+            result = cloud.check_connection("Groq", self.cfg, "demo")
+            self.assertIn("Transcription passed", result)
+            self.assertIn("formatting failed", result)
+            self.assertEqual(len(self.calls), 2)
+
     def test_groq_connection_denied(self):
         with patch.dict(cloud.PROVIDERS, Groq=(self.base + "/openai/v1", [], [])):
             self.responses.append((403, {"error": {"message": "Denied for supplied-key"}}))

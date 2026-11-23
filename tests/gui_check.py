@@ -47,6 +47,7 @@ with patch.object(system, "paste", side_effect=AssertionError("Wayland attempted
 # An unavailable formatter must preserve the original transcript inside the UI.
 app.global_key = False
 app.config = system.DEFAULTS.copy()
+app.capture_config = app.config.copy()
 app.proc = Mock()
 app.path = "/unused.wav"
 def execute(work, done):
@@ -60,6 +61,7 @@ buf = app.views["output"].get_buffer()
 assert buf.get_text(*buf.get_bounds(), True) == "meeting kal hai"
 assert "Using original transcript" in app.status.get_text()
 app.config["refine"] = False
+app.capture_config = app.config.copy()
 app.proc = Mock()
 with patch("voiceflow.app.background", execute), patch("voiceflow.system.finish"), \
      patch("voiceflow.system.credential", return_value="test"), \

@@ -27,9 +27,14 @@ DICTATION = "Treat the input as dictation. Preserve meaning and word order. Do n
 
 
 class ApiError(Exception):
-    def __init__(self, status, detail=""):
+    def __init__(self, status, detail="", code=""):
         super().__init__(f"Provider returned HTTP {status}" + (" · " + detail if detail else ""))
         self.status = status
+        self.model_unavailable = (
+            status in (400, 404) and
+            (code in ("model_not_found", "model_decommissioned") or
+             (status == 404 and "model" in detail.lower() and "does not exist" in detail.lower()))
+        )
 
 
 class NoRedirect(request.HTTPRedirectHandler):
@@ -65,8 +70,12 @@ def call(url, key, data=None, content_type="application/json", gemini=False):
         with exc:
             body = exc.read(8192)
         detail = ""
+        code = ""
         try:
-            message = json.loads(body)["error"]["message"]
+            provider_error = json.loads(body)["error"]
+            if isinstance(provider_error, dict):
+                code = provider_error.get("code", "")
+            message = provider_error["message"]
             if isinstance(message, str):
                 if key:
                     message = message.replace(key, "[redacted]")
@@ -84,7 +93,7 @@ def call(url, key, data=None, content_type="application/json", gemini=False):
             reference = exc.headers.get("x-request-id") or exc.headers.get("cf-ray", "")
             if re.fullmatch(r"[a-zA-Z0-9._-]{1,100}", reference) and (not key or key not in reference):
                 detail += " · Request ID " + reference
-        raise ApiError(exc.code, detail) from None
+        raise ApiError(exc.code, detail, code) from None
 
 
 def checked(text):
@@ -138,7 +147,7 @@ def refine(config, text, key):
     if provider == "Gemini":
         return gemini_text(base, key, model, [{"text": prompt}, {"text": text}]), model
     models = [model]
-    if provider == "Groq" and config["fallback"]:
+    if base == PROVIDERS["Groq"][0] and config["fallback"]:
         models += [m.strip() for m in config["fallback_models"].split(",") if m.strip()]
     models = list(dict.fromkeys(models))
     for i, model in enumerate(models):
@@ -147,7 +156,7 @@ def refine(config, text, key):
         try:
             result = call(base + "/chat/completions", key, json.dumps(payload).encode())
         except ApiError as exc:
-            if exc.status == 429 and i + 1 < len(models):
+            if (exc.status == 429 or exc.model_unavailable) and i + 1 < len(models):
                 continue
             raise
         choice = result["choices"][0]
@@ -175,7 +184,12 @@ def check_connection(provider, config, key):
             transcribe(config, Path(__file__).with_name("connection-test.m4a"), key)
             checks.append("transcription (" + config["speech_model"] + ")")
         if config["refine"] and config["text_provider"] in same_endpoint:
-            _, model = refine(config, "VoiceFlow connection test.", key)
+            try:
+                _, model = refine(config, "VoiceFlow connection test.", key)
+            except ApiError as exc:
+                if checks:
+                    return "Transcription passed · formatting failed: " + str(exc)
+                raise
             checks.append("formatting (" + model + ")")
         if checks:
             return "Connected · " + " and ".join(checks)

@@ -3,7 +3,7 @@
   <name>org.freedesktop.IBus.VoiceFlow</name>
   <description>VoiceFlow AI dictation</description>
   <exec>/usr/lib/voiceflow-zorin/voiceflow-ibus</exec>
-  <version>0.2.1</version>
+  <version>0.2.2</version>
   <author>VoiceFlow AI contributors</author>
   <license>Apache-2.0</license>
   <engines>
