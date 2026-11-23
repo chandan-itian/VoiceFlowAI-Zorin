@@ -56,6 +56,13 @@ def install_shortcuts():
     if source not in sources and not settings.set_value("sources", GLib.Variant("a(ss)", sources + [source])):
         raise RuntimeError("Enable VoiceFlow AI in Keyboard Settings → Input Sources.")
     Gio.Settings.sync()
+    import gi
+    gi.require_version("IBus", "1.0")
+    from gi.repository import IBus
+    IBus.init()
+    bus = IBus.Bus.new()
+    if not bus.is_connected() or not bus.set_global_engine("voiceflow-zorin"):
+        raise RuntimeError("Select VoiceFlow AI with Super + Space. If missing, sign out and back in.")
 
 
 def install_toggle():
@@ -180,7 +187,7 @@ class Preferences(Gtk.Dialog):
         accounts.add(label("For configured Groq models, Test connection sends a short built-in sample and uses API quota."))
         accounts.add(button("Test connection", self.test_connection))
         accounts.add(label("Global shortcuts"))
-        accounts.add(label("Select the VoiceFlow AI input source, then hold Ctrl + Shift to speak. Release either key to insert."))
+        accounts.add(label("Enable VoiceFlow AI, then hold F8 in a text field. Release F8 to insert."))
         accounts.add(button("Enable VoiceFlow AI input source", self.shortcuts))
         accounts.add(label("The toggle shortcut replaces GNOME’s previous input source shortcut. Super + Space still switches sources."))
         accounts.add(button("Enable Super + Shift + Space dictation", self.enable_toggle))
@@ -242,7 +249,7 @@ class Preferences(Gtk.Dialog):
     def shortcuts(self, _):
         try:
             install_shortcuts()
-            self.message.set_text("Use Super + Space to select VoiceFlow AI. If missing, sign out and back in.")
+            self.message.set_text("VoiceFlow AI activated. Hold F8 in your editor and release to insert.")
         except Exception as exc:
             self.message.set_text(str(exc))
 

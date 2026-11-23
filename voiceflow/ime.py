@@ -22,6 +22,7 @@ class DictationEngine(IBus.EngineSimple):
         self.focused = False
         self.private = False
         self.held = False
+        self.f8_down = False
         self.pending = 0
         self.session = None
         self.processing = False
@@ -49,7 +50,7 @@ class DictationEngine(IBus.EngineSimple):
 
     def reset_capture(self):
         self.generation += 1
-        self.processing = self.held = False
+        self.processing = self.held = self.f8_down = False
         if self.pending:
             GLib.source_remove(self.pending)
             self.pending = 0
@@ -70,6 +71,21 @@ class DictationEngine(IBus.EngineSimple):
     def do_process_key_event(self, key, code, state):
         modifier = key in CTRL or key in SHIFT
         release = bool(state & MOD.RELEASE_MASK)
+        if key == IBus.KEY_F8 and self.focused and not self.private:
+            if self.f8_down:
+                if release:
+                    self.f8_down = False
+                    if self.session:
+                        self.stop()
+                return True
+            if not release and not (state & (MOD.CONTROL_MASK | MOD.SHIFT_MASK | MOD.MOD1_MASK |
+                                             MOD.MOD4_MASK | MOD.SUPER_MASK | MOD.MOD5_MASK)):
+                if not self.processing and not self.held:
+                    self.f8_down = True
+                    self.start()
+                return True
+        if self.f8_down and not release:
+            self.reset_capture()
         if modifier and release and self.held:
             self.held = False
             if self.pending:
