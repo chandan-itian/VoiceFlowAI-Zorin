@@ -40,7 +40,9 @@ class TestDictation(unittest.TestCase):
     def test_capture_upload_and_refine(self):
         levels = []
         proc = system.record(self.audio, "sine=frequency=330", True, meter=levels.append)
-        time.sleep(0.9)
+        deadline = time.monotonic() + 8
+        while not levels and proc.poll() is None and time.monotonic() < deadline:
+            time.sleep(.05)
         system.finish(proc)
         self.assertGreater(max(levels), .05)
         streams = json.loads(subprocess.check_output(["ffprobe", "-v", "error", "-show_streams", "-of", "json", self.audio]))

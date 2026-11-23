@@ -1,6 +1,7 @@
 """Exercise the installed application across real D-Bus, PulseAudio and X11."""
 import json
 import os
+import signal
 import subprocess
 import sys
 import tempfile
@@ -109,7 +110,7 @@ Gtk.main()
         if os.environ.get("VF_BROWSER"):
             page = config["custom_url"] + "/editor"
             others.append(subprocess.Popen([os.environ["VF_BROWSER"], "--no-first-run", "--disable-sync",
-                "--user-data-dir=" + tmp + "/browser", "--new-window", page]))
+                "--user-data-dir=" + tmp + "/browser", "--new-window", page], start_new_session=True))
             win = dictate_into("VF browser fixture")
             wait(lambda: polished in run("xdotool", "getwindowname", win))
             print("PASS: dictation inserted into browser textarea")
@@ -119,7 +120,7 @@ Gtk.main()
             document.write_text("Start ")
             others.append(subprocess.Popen([os.environ["VF_WRITER"], "-env:UserInstallation=" +
                 (Path(tmp) / "office").as_uri(), "--nologo", "--norestore", "--writer", str(document)],
-                env=os.environ | {"SAL_USE_VCLPLUGIN": "gen"}))
+                env=os.environ | {"SAL_USE_VCLPLUGIN": "gen"}, start_new_session=True))
             win = dictate_into("VoiceFlow-Writer-check")
             wait(lambda: len(calls) >= (6 if os.environ.get("VF_BROWSER") else 4))
             # Read back Writer's selected document text via the X11 selection.
@@ -138,12 +139,20 @@ Gtk.main()
         assert app.wait(timeout=5) == 0
     finally:
         for process in others:
-            process.terminate()
+            try:
+                os.killpg(process.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
             try:
                 process.wait(timeout=10)
             except subprocess.TimeoutExpired:
                 process.kill()
                 process.wait()
+            # Helpers may outlive their launcher and continue writing the profile.
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
         target.terminate()
         target.wait()
         if app.poll() is None:
