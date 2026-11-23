@@ -136,6 +136,11 @@ Gtk.main()
     finally:
         for process in others:
             process.terminate()
+            try:
+                process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait()
         target.terminate()
         target.wait()
         if app.poll() is None:
