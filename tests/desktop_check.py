@@ -98,7 +98,8 @@ Gtk.main()
                 return wid if run("xdotool", "getactivewindow") == wid else None
             wid = wait(focus_ready_window)
             run("voiceflow-zorin", "--toggle")
-            time.sleep(1.0)
+            wait(lambda: run("pactl", "list", "short", "source-outputs"))
+            time.sleep(2.0)
             run("voiceflow-zorin", "--toggle")
             return wid
 

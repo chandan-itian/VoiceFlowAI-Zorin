@@ -19,7 +19,8 @@ jobs:
           # All dependencies are in Ubuntu's own archives. Third-party feeds on
           # hosted runners are unnecessary for this package installation.
           if [[ -f /etc/apt/sources.list.d/ubuntu.sources ]]; then
-            source_file=/etc/apt/sources.list.d/ubuntu.sources
+            source_file="$RUNNER_TEMP/ubuntu.sources"
+            sed -E 's|http[s]?://[^/]*ec2.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' /etc/apt/sources.list.d/ubuntu.sources > "$source_file"
           else
             source_file=/etc/apt/sources.list
           fi

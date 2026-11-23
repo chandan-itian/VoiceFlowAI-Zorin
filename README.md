@@ -2,9 +2,13 @@
 
 Online desktop dictation for Roman Hinglish, Hindi and English. Use one provider and model for speech recognition and another for text refinement. The default pairs Groq Whisper Large V3 with Llama 3.1 8B Instant. The desktop launcher uses the Android app’s five-bar logo.
 
+## Preview
+
+![VoiceFlow AI desktop window with an example Roman Hinglish result](docs/desktop-preview.png)
+
 ## Install
 
-Download the **voiceflow-zorin-deb** artifact from a successful [verification run](https://github.com/chandan-itian/VoiceFlowAI-Zorin/actions/workflows/verify.yml). Extract the ZIP, then run this command in the directory containing the package:
+Download [the Debian installer from Releases](https://github.com/chandan-itian/VoiceFlowAI-Zorin/releases/latest). In the directory containing the downloaded package, run:
 
 ```sh
 sudo apt install ./voiceflow-zorin_0.1.0_all.deb
