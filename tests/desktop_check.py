@@ -20,8 +20,9 @@ def wait(check):
     end = time.monotonic() + 18
     while time.monotonic() < end:
         try:
-            if check():
-                return
+            result = check()
+            if result:
+                return result
         except subprocess.SubprocessError:
             pass
         time.sleep(.15)
@@ -89,9 +90,13 @@ Gtk.main()
         assert json.loads(calls[1][1])["messages"][1]["content"] == raw
         print("PASS: packaged app, keyring, cancel, PulseAudio capture, M4A upload, refinement and X11 insertion")
         def dictate_into(window_name):
-            wait(lambda: run("xdotool", "search", "--onlyvisible", "--name", window_name))
-            wid = run("xdotool", "search", "--onlyvisible", "--name", window_name).splitlines()[-1]
-            run("xdotool", "windowactivate", "--sync", wid)
+            def focus_ready_window():
+                wid = run("xdotool", "search", "--onlyvisible", "--name", window_name).splitlines()[-1]
+                run("xdotool", "windowactivate", "--sync", wid)
+                # Writer can briefly unmap its document window while starting up.
+                time.sleep(.4)
+                return wid if run("xdotool", "getactivewindow") == wid else None
+            wid = wait(focus_ready_window)
             run("voiceflow-zorin", "--toggle")
             time.sleep(1.0)
             run("voiceflow-zorin", "--toggle")
@@ -109,7 +114,8 @@ Gtk.main()
             document = Path(tmp) / "VoiceFlow-Writer-check.txt"
             document.write_text("Start ")
             others.append(subprocess.Popen([os.environ["VF_WRITER"], "-env:UserInstallation=" +
-                (Path(tmp) / "office").as_uri(), "--norestore", "--writer", str(document)]))
+                (Path(tmp) / "office").as_uri(), "--nologo", "--norestore", "--writer", str(document)],
+                env=os.environ | {"SAL_USE_VCLPLUGIN": "gen"}))
             win = dictate_into("VoiceFlow-Writer-check")
             wait(lambda: len(calls) >= (6 if os.environ.get("VF_BROWSER") else 4))
             # Read back Writer's selected document text via the X11 selection.
