@@ -11,10 +11,16 @@ Online desktop dictation for Roman Hinglish, Hindi and English. Use one provider
 Download [the Debian installer from Releases](https://github.com/chandan-itian/VoiceFlowAI-Zorin/releases/latest). In the directory containing the downloaded package, run:
 
 ```sh
-sudo apt install ./voiceflow-zorin_0.2.3_all.deb
+sudo apt install ./voiceflow-zorin_0.2.4_all.deb
 ```
 
 Open **VoiceFlow AI** from the applications menu. The package targets Zorin OS 17 and 18 and their Ubuntu 22.04 and 24.04 bases. It uses Python 3, GTK 3, FFmpeg and the desktop Secret Service. No local AI model download is required.
+
+## Ctrl + Super on Zorin 18.1 Wayland
+
+After installation, sign out and back in. Enable **VoiceFlow Push to Talk** in GNOME Extensions, or run `gnome-extensions enable voiceflow-ptt@chandan-itian.github.io`. Open **VoiceFlow AI → Settings → Providers → Enable VoiceFlow AI input source** and select **VoiceFlow AI** in the keyboard indicator. The main app may then be closed.
+
+Click an editable field, hold **Ctrl + Super**, speak and release either modifier. A non-interactive black capsule displays live microphone levels on the focused monitor. The selected IBus engine commits the result to its original input context. Changing focus discards pending delivery. GTK and Chromium clients must expose an input-method context (Chromium versions with opt-in Wayland IME support may need `--enable-wayland-ime`). Password/PIN contexts are excluded. No accessibility permission, raw keyboard device access or clipboard injection is used by this shortcut.
 
 ## Dictate
 

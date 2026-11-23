@@ -64,6 +64,8 @@ jobs:
           export PYTHONPATH=/usr/lib/voiceflow-zorin
           export XDG_RUNTIME_DIR=$(mktemp -d)
           dbus-run-session -- xvfb-run -a bash tests/gnome_shortcut.sh
+          export XDG_RUNTIME_DIR=$(mktemp -d)
+          dbus-run-session -- xvfb-run -a bash tests/wayland_shortcut.sh
       - uses: actions/upload-artifact@v4
         if: matrix.os == 'ubuntu-24.04'
         with:

@@ -1,0 +1,3 @@
+<schemalist><schema id="io.github.chandan_itian.voiceflow.shortcuts" path="/io/github/chandan-itian/voiceflow/shortcuts/">
+<key name="voiceflow-control-super" type="as"><default>['&lt;Control&gt;Super_L','&lt;Control&gt;Super_R','&lt;Super&gt;Control_L','&lt;Super&gt;Control_R']</default></key>
+</schema></schemalist>

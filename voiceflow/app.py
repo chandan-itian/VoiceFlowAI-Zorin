@@ -187,7 +187,7 @@ class Preferences(Gtk.Dialog):
         accounts.add(label("For configured Groq models, Test connection sends a short built-in sample and uses API quota."))
         accounts.add(button("Test connection", self.test_connection))
         accounts.add(label("Global shortcuts"))
-        accounts.add(label("Enable VoiceFlow AI, then hold F8 in a text field. Release F8 to insert."))
+        accounts.add(label("On Zorin Wayland, enable VoiceFlow Push to Talk in GNOME Extensions and select VoiceFlow AI below. Hold Ctrl + Super in your editor and release either key to insert. F8 also works in supported editors."))
         accounts.add(button("Enable VoiceFlow AI input source", self.shortcuts))
         accounts.add(label("The toggle shortcut replaces GNOME’s previous input source shortcut. Super + Space still switches sources."))
         accounts.add(button("Enable Super + Shift + Space dictation", self.enable_toggle))

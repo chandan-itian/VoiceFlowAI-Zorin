@@ -5,7 +5,7 @@ from pathlib import Path
 
 import gi
 gi.require_version("IBus", "1.0")
-from gi.repository import GLib, IBus
+from gi.repository import GLib, Gio, IBus
 from . import system
 from .app import background
 
@@ -14,7 +14,19 @@ SHIFT = {IBus.KEY_Shift_L, IBus.KEY_Shift_R}
 MOD = IBus.ModifierType
 
 
+SERVICE = "io.github.chandan_itian.VoiceFlowInput"
+PATH = "/io/github/chandan_itian/VoiceFlowInput"
+INTERFACE = Gio.DBusNodeInfo.new_for_xml(f"""<node><interface name="{SERVICE}">
+    <method name="Begin"><arg type="b" direction="out"/></method>
+    <method name="End"><arg type="b" direction="out"/></method>
+    <method name="Cancel"><arg type="b" direction="out"/></method>
+    <signal name="Level"><arg type="d"/></signal></interface></node>""")
+
+
 class DictationEngine(IBus.EngineSimple):
+    active = None
+    shell_capture = False
+    connection = None
     __gtype_name__ = "VoiceFlowDictationEngine"
 
     def __init__(self, **kwargs):
@@ -30,9 +42,13 @@ class DictationEngine(IBus.EngineSimple):
 
     def do_focus_in(self):
         self.focused = True
+        DictationEngine.active = self
+        self.get_surrounding_text()  # Subscribe before taking a caret snapshot.
 
     def do_focus_out(self):
         self.focused = False
+        if DictationEngine.active is self:
+            DictationEngine.active = None
         self.reset_capture()
 
     def do_reset(self):
@@ -41,6 +57,8 @@ class DictationEngine(IBus.EngineSimple):
 
     def do_disable(self):
         self.focused = False
+        if DictationEngine.active is self:
+            DictationEngine.active = None
         self.reset_capture()
 
     def do_set_content_type(self, purpose, hints):
@@ -49,6 +67,7 @@ class DictationEngine(IBus.EngineSimple):
             self.reset_capture()
 
     def reset_capture(self):
+        self.end_meter()
         self.generation += 1
         self.processing = self.held = self.f8_down = False
         if self.pending:
@@ -61,6 +80,21 @@ class DictationEngine(IBus.EngineSimple):
             proc.communicate()
             temp.cleanup()
             self.wave("")
+
+    def caret_state(self):
+        if self.client_capabilities & IBus.Capabilite.SURROUNDING_TEXT:
+            text, cursor, anchor = self.get_surrounding_text()
+            if text is not None:
+                return (text.get_text(), cursor, anchor)
+        return None
+
+    def end_meter(self):
+        if self.shell_capture:
+            self.emit_level(-1.0)
+            self.shell_capture = False
+
+    def emit_level(self, level):
+        self.connection.emit_signal(None, PATH, SERVICE, "Level", GLib.Variant("(d)", (level,)))
 
     def wave(self, value):
         self.update_preedit_text(IBus.Text.new_from_string(value), 0, bool(value))
@@ -126,7 +160,10 @@ class DictationEngine(IBus.EngineSimple):
                 self.stop()
                 return False
             bars.append("▁▂▃▄▅▆▇█"[min(7, int(levels[-1] ** 0.5 * 18))])
-            self.wave("".join(bars))
+            if self.shell_capture:
+                self.emit_level(levels[-1])
+            else:
+                self.wave("".join(bars))
             return True
         if tick():
             GLib.timeout_add(65, tick)
@@ -136,6 +173,8 @@ class DictationEngine(IBus.EngineSimple):
         proc, temp, path, config = self.session
         self.session = None
         self.wave("")
+        origin = self.origin if self.shell_capture else None
+        self.end_meter()
         self.processing = True
         generation = self.generation
         def work():
@@ -147,6 +186,8 @@ class DictationEngine(IBus.EngineSimple):
             if self.generation != generation or not self.focused or self.private:
                 return
             self.processing = False
+            if origin is not None and self.caret_state() != origin:
+                return
             if err:
                 self.report(err)
             else:
@@ -162,6 +203,32 @@ def main():
     factory = IBus.Factory.new(bus.get_connection())
     factory.add_engine("voiceflow-zorin", DictationEngine.__gtype__)
     bus.request_name("org.freedesktop.IBus.VoiceFlow", 0)
+    connection = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+    DictationEngine.connection = connection
+    def control(_, sender, path, interface, method, args, invocation):
+        engine = DictationEngine.active
+        ok = False
+        if engine and engine.focused and not engine.private:
+            if method == "Begin" and not (engine.session or engine.processing or engine.pending):
+                engine.origin = engine.caret_state()
+                if engine.origin and engine.origin[1] != engine.origin[2]:
+                    invocation.return_value(GLib.Variant("(b)", (False,)))
+                    return
+                engine.shell_capture = True
+                engine.start()
+                ok = engine.session is not None
+                if not ok:
+                    engine.end_meter()
+            elif engine.shell_capture and engine.session:
+                if method == "End":
+                    engine.stop()
+                    ok = True
+                elif method == "Cancel":
+                    engine.reset_capture()
+                    ok = True
+        invocation.return_value(GLib.Variant("(b)", (ok,)))
+    connection.register_object(PATH, INTERFACE.interfaces[0], control, None, None)
+    Gio.bus_own_name_on_connection(connection, SERVICE, Gio.BusNameOwnerFlags.NONE, None, None)
     loop = GLib.MainLoop()
     bus.connect("disconnected", lambda *_: loop.quit())
     loop.run()

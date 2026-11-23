@@ -1,4 +1,5 @@
 """Drive an actual IBus input context through press, release, waveform and commit."""
+import os
 import json
 import subprocess
 import threading
@@ -92,12 +93,23 @@ entry.grab_focus()
 entry.set_position(7)
 def send_keys():
     time.sleep(.6)
-    subprocess.run(["xdotool","keydown","F8"],check=True)
-    time.sleep(1.7)
-    subprocess.run(["xdotool","keyup","F8"],check=True)
-threading.Thread(target=send_keys,daemon=True).start()
-until(lambda: entry.get_text() == "Before Mujhe knowledge hai. after", 12)
-print("PASS: X11 keydown/keyup to real GTK editor:", entry.get_text())
+    if os.environ.get("VF_CONTROL_BUS"):
+        for method in ("Begin", "End"):
+            out = subprocess.check_output(["gdbus", "call", "--session", "--dest",
+                "io.github.chandan_itian.VoiceFlowInput", "--object-path", "/io/github/chandan_itian/VoiceFlowInput",
+                "--method", "io.github.chandan_itian.VoiceFlowInput." + method], text=True)
+            assert "true" in out, out
+            if method == "Begin":
+                time.sleep(1.7)
+    else:
+        keys = os.environ.get("VF_HOLD_KEYS", "F8").split()
+        subprocess.run(["xdotool", *[part for k in keys for part in ("keydown", k)]], check=True)
+        time.sleep(1.7)
+        subprocess.run(["xdotool", *[part for k in reversed(keys) for part in ("keyup", k)]], check=True)
+for count in (1, 2):
+    threading.Thread(target=send_keys, daemon=True).start()
+    until(lambda: entry.get_text() == "Before " + "Mujhe knowledge hai." * count + " after", 12)
+print("PASS: repeated commits into GTK editor:", entry.get_text())
 
 tone.terminate()
 tone.wait(timeout=5)
