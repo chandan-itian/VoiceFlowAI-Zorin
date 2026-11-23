@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=VoiceFlow AI
+Comment=Online voice dictation in Hindi, English and Hinglish
+Exec=voiceflow-zorin
+Icon=voiceflow-zorin
+Terminal=false
+Type=Application
+Categories=AudioVideo;Audio;Utility;
+StartupNotify=true

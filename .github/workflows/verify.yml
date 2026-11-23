@@ -1,0 +1,49 @@
+name: Verify desktop app
+on: [push, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and install package
+        run: |
+          ./packaging/build-deb.sh
+          sudo apt-get update -qq
+          sudo apt-get install -y ./dist/*.deb xvfb openbox pulseaudio dbus-x11 gnome-keyring weston
+          test -s /usr/share/icons/hicolor/512x512/apps/voiceflow-zorin.png
+      - name: Provider, codec and configuration tests
+        run: /usr/bin/python3 -m unittest discover -s tests -v
+      - name: Packaged X11 dictation flow
+        run: |
+          export PYTHONPATH=/usr/lib/voiceflow-zorin
+          export XDG_RUNTIME_DIR=$(mktemp -d)
+          dbus-run-session -- xvfb-run -a bash -eu -c '
+            openbox >/tmp/openbox.log 2>&1 &
+            pulseaudio --start --exit-idle-time=-1
+            pactl load-module module-null-sink sink_name=dictationtest
+            pactl set-default-source dictationtest.monitor
+            eval "$(printf test | gnome-keyring-daemon --unlock --components=secrets)"
+            /usr/bin/python3 tests/desktop_check.py
+          '
+      - name: Wayland GTK smoke and copy fallback
+        run: |
+          export PYTHONPATH=/usr/lib/voiceflow-zorin
+          export XDG_RUNTIME_DIR=$(mktemp -d)
+          dbus-run-session -- bash -eu -c '
+            weston --backend=headless-backend.so --socket=voiceflow-test --idle-time=0 >/tmp/voiceflow-weston.log 2>&1 &
+            for i in $(seq 1 50); do test -S "$XDG_RUNTIME_DIR/voiceflow-test" && break; sleep .2; done
+            WAYLAND_DISPLAY=voiceflow-test GDK_BACKEND=wayland /usr/bin/python3 tests/gui_check.py
+          '
+      - uses: actions/upload-artifact@v4
+        if: matrix.os == 'ubuntu-24.04'
+        with:
+          name: voiceflow-zorin-deb
+          path: dist/*.deb
