@@ -5,11 +5,14 @@ export XDG_CONFIG_HOME=$(mktemp -d)
 export XDG_CURRENT_DESKTOP=GNOME
 export XDG_SESSION_TYPE=x11
 export LIBGL_ALWAYS_SOFTWARE=1
+dbus-update-activation-environment XDG_CONFIG_HOME XDG_RUNTIME_DIR DISPLAY XAUTHORITY XDG_CURRENT_DESKTOP XDG_SESSION_TYPE
+gsettings set org.gnome.shell welcome-dialog-last-shown-version '999'
 gnome-shell --x11 --replace >"$XDG_RUNTIME_DIR/shell.log" 2>&1 &
 shell_pid=$!
-trap 'kill "$shell_pid" 2>/dev/null || true; tail -30 "$XDG_RUNTIME_DIR/shell.log"' EXIT
+trap 'kill "$shell_pid" 2>/dev/null || true; tail -30 "$XDG_RUNTIME_DIR/shell.log"; cat "$XDG_RUNTIME_DIR/media.log" /tmp/voiceflow-gnome-app.log 2>/dev/null || true' EXIT
 gdbus wait --session --timeout 45 org.gnome.Shell
-/usr/libexec/gsd-media-keys >"$XDG_RUNTIME_DIR/media.log" 2>&1 &
+for i in $(seq 1 100); do grep -q "GNOME Shell started" "$XDG_RUNTIME_DIR/shell.log" && break; sleep .2; done
+G_MESSAGES_DEBUG=all /usr/libexec/gsd-media-keys >"$XDG_RUNTIME_DIR/media.log" 2>&1 &
 gdbus wait --session --timeout 30 org.gnome.SettingsDaemon.MediaKeys
 pulseaudio --start --exit-idle-time=-1
 pactl load-module module-null-sink sink_name=voiceflow
@@ -17,6 +20,11 @@ pactl set-default-source voiceflow.monitor
 /usr/bin/python3 -c 'from voiceflow.app import install_toggle; install_toggle()'
 voiceflow-zorin >/tmp/voiceflow-gnome-app.log 2>&1 &
 for i in $(seq 1 60); do xdotool search --onlyvisible --name '^VoiceFlow AI$' >/dev/null && break; sleep .2; done
+xdotool key Escape
+win=$(xdotool search --onlyvisible --name '^VoiceFlow AI$' | head -1)
+xdotool windowactivate --sync "$win"
+gsettings get org.gnome.settings-daemon.plugins.media-keys custom-keybindings
+sleep 1
 xdotool key Super_L+Shift_L+space
 for i in $(seq 1 60); do xdotool search --onlyvisible --name '^VoiceFlow recording$' >/dev/null && break; sleep .2; done
 xdotool search --onlyvisible --name '^VoiceFlow recording$' >/dev/null
