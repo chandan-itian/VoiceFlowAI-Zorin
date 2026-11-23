@@ -60,7 +60,7 @@ jobs:
       - name: GNOME Shell global shortcut on Noble
         if: matrix.os == 'ubuntu-24.04'
         run: |
-          sudo apt-get install -y --no-install-recommends gnome-shell gnome-settings-daemon
+          sudo apt-get install -y --no-install-recommends gnome-shell gnome-settings-daemon gjs xwayland
           export PYTHONPATH=/usr/lib/voiceflow-zorin
           export XDG_RUNTIME_DIR=$(mktemp -d)
           dbus-run-session -- xvfb-run -a bash tests/gnome_shortcut.sh

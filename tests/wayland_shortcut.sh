@@ -12,6 +12,7 @@ trap 'kill "$pid" 2>/dev/null || true; tail -55 "$XDG_RUNTIME_DIR/shell.log"' EX
 gdbus wait --session --timeout 40 org.gnome.Shell
 for i in $(seq 1 100); do grep -q 'GNOME Shell started' "$XDG_RUNTIME_DIR/shell.log" && break; sleep .2; done
 export WAYLAND_DISPLAY=voiceflow-test GDK_BACKEND=wayland GTK_IM_MODULE=ibus
+gnome-extensions info voiceflow-ptt@chandan-itian.github.io
 gnome-extensions list --active | grep voiceflow-ptt
 pulseaudio --start --exit-idle-time=-1
 pactl load-module module-null-sink sink_name=voiceflow
