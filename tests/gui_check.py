@@ -15,7 +15,7 @@ assert prefs.values()["text_model"] == "llama-3.1-8b-instant"
 prefs.secret.set_text("new-test-key")
 with patch("voiceflow.app.background", lambda work, done: done(work(), None)), \
      patch("voiceflow.system.credential", side_effect=AssertionError("Used old key")), \
-     patch("voiceflow.cloud.fetch_models", return_value=["model"]) as fetch:
+     patch("voiceflow.cloud.check_connection", return_value="Connected") as fetch:
     prefs.test_connection(None)
     assert fetch.call_args.args[-1] == "new-test-key"
     assert "Connected" in prefs.message.get_text()

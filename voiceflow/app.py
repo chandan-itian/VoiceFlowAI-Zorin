@@ -9,7 +9,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
 from gi.repository import Gdk, Gio, GLib, Gtk
 
-from . import cloud, system
+from . import cloud, system, __version__
 
 
 def column(spacing=12):
@@ -58,7 +58,7 @@ def install_shortcuts():
 
 class Preferences(Gtk.Dialog):
     def __init__(self, parent, config):
-        super().__init__(title="Settings", transient_for=parent, modal=True)
+        super().__init__(title=f"Settings · VoiceFlow {__version__}", transient_for=parent, modal=True)
         self.add_button("Close", Gtk.ResponseType.CANCEL)
         self.add_button("Save settings", Gtk.ResponseType.OK)
         self.set_default_size(560, 550)
@@ -120,6 +120,7 @@ class Preferences(Gtk.Dialog):
         self.who.connect("changed", lambda *_: self.secret.set_text(""))
         accounts.add(self.secret)
         accounts.add(button("Save key to desktop keyring", self.save_key))
+        accounts.add(label("For configured Groq models, Test connection sends a short built-in sample and uses API quota."))
         accounts.add(button("Test connection", self.test_connection))
         accounts.add(label("Global shortcuts"))
         accounts.add(label("Select the VoiceFlow AI input source, then hold Ctrl + Shift to speak. Release either key to insert."))
@@ -142,11 +143,11 @@ class Preferences(Gtk.Dialog):
         background(lambda: system.credential(provider, config, value), saved)
 
     def test_connection(self, _):
-        provider, config = self.who.get_active_id(), self.credentials_config()
+        provider, config = self.who.get_active_id(), self.values(validate=False)
         entered = self.secret.get_text().strip()
-        self.message.set_text(f"Checking {provider} model list…")
-        background(lambda: cloud.fetch_models(provider, config, entered or system.credential(provider, config)),
-                   lambda values, err: self.message.set_text(err or f"Connected · {len(values)} models listed."))
+        self.message.set_text(f"Checking {provider}…")
+        background(lambda: cloud.check_connection(provider, config, entered or system.credential(provider, config)),
+                   lambda result, err: self.message.set_text(err or result))
 
     def fetch(self, stage):
         prov, model = self.stages[stage]
@@ -178,13 +179,13 @@ class Preferences(Gtk.Dialog):
         except Exception as exc:
             self.message.set_text(str(exc))
 
-    def values(self):
+    def values(self, validate=True):
         result = self.credentials_config()
         result.update({key: widget.get_active() for key, widget in self.toggles.items()})
         for stage, (prov, model) in self.stages.items():
             result[stage + "_provider"] = prov.get_active_id()
             result[stage + "_model"] = model.get_child().get_text().strip()
-            if stage == "speech" or result["refine"]:
+            if validate and (stage == "speech" or result["refine"]):
                 cloud.endpoint(prov.get_active_id(), result)
                 if not result[stage + "_model"]:
                     raise ValueError("Enter a model ID for the selected provider.")

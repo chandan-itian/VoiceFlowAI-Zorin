@@ -1,6 +1,8 @@
 """Online dictation providers. All network calls run on a worker thread."""
 import base64
 import json
+import re
+from . import __version__
 import uuid
 from pathlib import Path
 from urllib import error, parse, request
@@ -47,7 +49,12 @@ def endpoint(provider, config):
 
 
 def call(url, key, data=None, content_type="application/json", gemini=False):
-    headers = {"User-Agent": "VoiceFlowAI-Zorin/0.2.0", "Accept": "application/json", "Content-Type": content_type}
+    headers = {"User-Agent": f"VoiceFlowAI-Zorin/{__version__}", "Accept": "application/json", "Content-Type": content_type}
+    key = key.strip()
+    if not gemini and key.lower().startswith("bearer "):
+        key = key[7:].strip()
+    if key and (not key.isprintable() or not key.isascii() or any(c.isspace() for c in key)):
+        raise ValueError("Enter only the API key in Providers.")
     if key:
         headers.update({"x-goog-api-key": key} if gemini else {"Authorization": "Bearer " + key})
     req = request.Request(url, headers=headers, data=data)
@@ -66,8 +73,17 @@ def call(url, key, data=None, content_type="application/json", gemini=False):
                 detail = " ".join(message.split())[:220]
         except (ValueError, KeyError, TypeError):
             pass
-        if exc.code == 403 and not detail:
-            detail = "Access denied. Check the provider account permissions and network access."
+        if exc.code == 403:
+            parts = parse.urlsplit(url)
+            target = parts.hostname + parts.path
+            if not detail:
+                detail = "Access denied. Check project permissions for this operation."
+                if exc.headers.get("cf-mitigated") == "challenge" or b"error code: 1010" in body.lower():
+                    detail = "The network gateway blocked the request before the API returned JSON."
+            detail = f"{target} · {detail}"
+            reference = exc.headers.get("x-request-id") or exc.headers.get("cf-ray", "")
+            if re.fullmatch(r"[a-zA-Z0-9._-]{1,100}", reference) and (not key or key not in reference):
+                detail += " · Request ID " + reference
         raise ApiError(exc.code, detail) from None
 
 
@@ -147,3 +163,21 @@ def fetch_models(provider, config, key):
         return sorted(m["name"].removeprefix("models/") for m in data["models"]
                       if "generateContent" in m.get("supportedGenerationMethods", []))
     return sorted(m["id"] for m in data["data"])
+
+def check_connection(provider, config, key):
+    base = endpoint(provider, config)
+    if base == PROVIDERS["Groq"][0]:
+        same_endpoint = {provider, "Groq"}
+        if config["custom_url"].strip().rstrip("/") == base:
+            same_endpoint.add("Custom")
+        checks = []
+        if config["speech_provider"] in same_endpoint:
+            transcribe(config, Path(__file__).with_name("connection-test.m4a"), key)
+            checks.append("transcription (" + config["speech_model"] + ")")
+        if config["refine"] and config["text_provider"] in same_endpoint:
+            _, model = refine(config, "VoiceFlow connection test.", key)
+            checks.append("formatting (" + model + ")")
+        if checks:
+            return "Connected · " + " and ".join(checks)
+    models = fetch_models(provider, config, key)
+    return f"Connected · {len(models)} models listed."

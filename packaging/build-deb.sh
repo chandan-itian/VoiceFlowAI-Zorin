@@ -9,13 +9,13 @@ chmod 755 "$root"
 install -Dm755 packaging/voiceflow-zorin "$root/usr/bin/voiceflow-zorin"
 install -Dm755 packaging/voiceflow-ibus "$root/usr/lib/voiceflow-zorin/voiceflow-ibus"
 install -Dm644 packaging/voiceflow.xml "$root/usr/share/ibus/component/voiceflow.xml"
-install -m644 voiceflow/*.py "$root/usr/lib/voiceflow-zorin/voiceflow/"
+install -m644 voiceflow/*.py voiceflow/connection-test.m4a "$root/usr/lib/voiceflow-zorin/voiceflow/"
 install -Dm644 assets/voiceflow-zorin.png "$root/usr/share/icons/hicolor/512x512/apps/voiceflow-zorin.png"
 install -Dm644 packaging/voiceflow-zorin.desktop "$root/usr/share/applications/io.github.chandan_itian.VoiceFlowAI.desktop"
 install -Dm644 LICENSE "$root/usr/share/doc/voiceflow-zorin/copyright"
 cat > "$root/DEBIAN/control" <<'CONTROL'
 Package: voiceflow-zorin
-Version: 0.2.0
+Version: 0.2.1
 Section: sound
 Priority: optional
 Architecture: all
@@ -25,4 +25,4 @@ Recommends: gnome-keyring, gnome-settings-daemon-common
 Description: Online desktop dictation with configurable transcription and refinement
  Record speech, transcribe via a cloud provider, and optionally refine the text.
 CONTROL
-dpkg-deb --root-owner-group --build "$root" dist/voiceflow-zorin_0.2.0_all.deb
+dpkg-deb --root-owner-group --build "$root" dist/voiceflow-zorin_0.2.1_all.deb

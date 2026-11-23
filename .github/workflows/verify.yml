@@ -20,12 +20,12 @@ jobs:
           # hosted runners are unnecessary for this package installation.
           if [[ -f /etc/apt/sources.list.d/ubuntu.sources ]]; then
             source_file="$RUNNER_TEMP/ubuntu.sources"
-            sed -E 's|http[s]?://[^/]*ec2.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' /etc/apt/sources.list.d/ubuntu.sources > "$source_file"
+            sed -E 's|http://|https://|g' /etc/apt/sources.list.d/ubuntu.sources > "$source_file"
           else
             source_file=/etc/apt/sources.list
           fi
-          apt_sources=(-o "Dir::Etc::sourcelist=$source_file" -o "Dir::Etc::sourceparts=-")
-          sudo apt-get "${apt_sources[@]}" -o Acquire::Retries=2 update -qq
+          apt_sources=(-o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 -o Acquire::Retries=2 -o "Dir::Etc::sourcelist=$source_file" -o "Dir::Etc::sourceparts=-")
+          sudo apt-get "${apt_sources[@]}" update -qq
           sudo apt-get "${apt_sources[@]}" install -y --no-install-recommends ./dist/*.deb xvfb xauth openbox pulseaudio pulseaudio-utils dbus-x11 gnome-keyring weston libreoffice-writer
           test -s /usr/share/icons/hicolor/512x512/apps/voiceflow-zorin.png
       - name: Provider, codec and configuration tests

@@ -11,14 +11,14 @@ Online desktop dictation for Roman Hinglish, Hindi and English. Use one provider
 Download [the Debian installer from Releases](https://github.com/chandan-itian/VoiceFlowAI-Zorin/releases/latest). In the directory containing the downloaded package, run:
 
 ```sh
-sudo apt install ./voiceflow-zorin_0.2.0_all.deb
+sudo apt install ./voiceflow-zorin_0.2.1_all.deb
 ```
 
 Open **VoiceFlow AI** from the applications menu. The package targets Zorin OS 17 and 18 and their Ubuntu 22.04 and 24.04 bases. It uses Python 3, GTK 3, FFmpeg and the desktop Secret Service. No local AI model download is required.
 
 ## Dictate
 
-1. Open **Settings → Providers**, choose a provider, enter your API key and click **Save key to desktop keyring**. **Test connection** checks the provider’s model list. A custom service without a model list can still accept dictation via a manually entered model ID.
+1. Open **Settings → Providers**, choose a provider, enter your API key and click **Save key to desktop keyring**. **Test connection** exercises configured Groq models with a short synthetic speech sample and a formatting request when enabled. Other providers use their model list. A custom service without a model list can still accept dictation via a manually entered model ID.
 2. Under **Dictation**, select the speech provider/model and optional refinement provider/model separately. Choose **Roman Hinglish** to keep Hindi in Latin letters and English in standard English spelling. Save settings.
 3. Click **Start dictation**, speak, then **Stop and transcribe**. Compare the original transcript and formatted text in their tabs. Click **Copy result** to paste it elsewhere. Recording stops automatically after five minutes.
 4. For dictation in other apps, open **Settings → Providers → Enable VoiceFlow AI input source**. Select **VoiceFlow AI** in the desktop keyboard indicator or with **Super + Space**. If it does not appear after installation, sign out and back in.
@@ -26,7 +26,7 @@ Open **VoiceFlow AI** from the applications menu. The package targets Zorin OS 1
 
 This shortcut works while the VoiceFlow input source is active in apps supporting IBus on X11 or Wayland. Disable any competing Ctrl + Shift layout-switch binding in Keyboard Settings. The main window still supports button-operated dictation. Existing desktop shortcuts to `voiceflow-zorin --toggle` retain their original clipboard behavior.
 
-**Groq connection test.** Select Groq and enter the key. **Test connection** checks the entered key immediately. **Save key to desktop keyring** makes it available for dictation. Groq already uses `https://api.groq.com/openai/v1`. Only Custom uses the editable URL. If the provider denies the request, Settings displays its error message when available.
+**Groq connection test.** Select Groq and enter the key. **Test connection** checks the entered key immediately. **Save key to desktop keyring** makes it available for dictation. Groq already uses `https://api.groq.com/openai/v1`. Only Custom uses the editable URL. After upgrading, sign out and back in to reload the desktop app and input method. The Settings title shows the running version. If the provider denies the request, Settings displays its error message when available.
 
 ## Providers
 

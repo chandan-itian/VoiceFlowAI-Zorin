@@ -75,6 +75,24 @@ class TestDictation(unittest.TestCase):
             self.assertEqual(headers["Authorization"], "Bearer supplied-key")
             self.assertIn("VoiceFlowAI", headers["User-Agent"])
 
+    def test_groq_check_uses_configured_operations_without_catalog_access(self):
+        with patch.dict(cloud.PROVIDERS, Groq=(self.base, [], [])):
+            self.responses.extend([(200, {"text": "Voice flow connection test."}),
+                                   (200, {"choices": [{"message": {"content": "VoiceFlow connection test."}}]})])
+            result = cloud.check_connection("Custom", self.cfg, "Bearer example")
+            self.assertIn(self.cfg["speech_model"], result)
+            self.assertIn(self.cfg["text_model"], result)
+            self.assertEqual([path for path, *_ in self.calls], ["/audio/transcriptions", "/chat/completions"])
+            self.assertIn(b"ftyp", self.calls[0][2])
+            self.assertTrue(all(h["Authorization"] == "Bearer example" for _, h, _ in self.calls))
+
+    def test_real_operation_denied_stops_at_transcription(self):
+        with patch.dict(cloud.PROVIDERS, Groq=(self.base, [], [])):
+            self.responses.append((403, {}))
+            with self.assertRaisesRegex(cloud.ApiError, r"403 .*audio/transcriptions"):
+                cloud.check_connection("Groq", self.cfg, "test")
+            self.assertEqual(len(self.calls), 1)
+
     def test_gemini_audio_and_listing(self):
         self.cfg.update(speech_provider="Gemini",speech_model="gemini-test")
         self.audio.write_bytes(b"example")
