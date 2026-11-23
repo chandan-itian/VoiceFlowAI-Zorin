@@ -38,6 +38,7 @@ jobs:
             openbox >/tmp/openbox.log 2>&1 &
             pulseaudio --start --exit-idle-time=-1
             pactl load-module module-null-sink sink_name=dictationtest
+            pactl set-default-sink dictationtest
             pactl set-default-source dictationtest.monitor
             eval "$(printf test | gnome-keyring-daemon --unlock --components=secrets)"
             export XDG_CONFIG_HOME=$(mktemp -d)

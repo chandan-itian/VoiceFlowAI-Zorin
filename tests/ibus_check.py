@@ -62,12 +62,16 @@ def release():
     ctx.process_key_event(IBus.KEY_Shift_L, 42, mod.CONTROL_MASK | mod.SHIFT_MASK | mod.RELEASE_MASK)
     ctx.process_key_event(IBus.KEY_Control_L, 29, mod.CONTROL_MASK | mod.RELEASE_MASK)
 
+# Feed the virtual PulseAudio sink so the test waits for captured audio,
+# including on runners where the monitor source initially starts suspended.
+tone = subprocess.Popen(["ffmpeg", "-nostdin", "-loglevel", "error", "-re", "-f", "lavfi",
+                         "-i", "sine=frequency=440", "-t", "30", "-f", "pulse", "VoiceFlow test"])
 press()
 ctx.process_key_event(IBus.KEY_C, 46, mod.CONTROL_MASK | mod.SHIFT_MASK)
 release()
 time.sleep(.25)
 press()
-until(lambda: len([w for w in waves if w]) >= 10)
+until(lambda: sum(any(bar in w for bar in "▂▃▄▅▆▇█") for w in waves) >= 5)
 release()
 until(lambda: commits)
 assert waves[-1] == "" and commits == ["Mujhe knowledge hai."] and calls == ["/audio/transcriptions"]
@@ -93,5 +97,7 @@ threading.Thread(target=send_keys,daemon=True).start()
 until(lambda: entry.get_text() == "Mujhe knowledge hai.", 12)
 print("PASS: X11 keydown/keyup to real GTK editor:", entry.get_text())
 
+tone.terminate()
+tone.wait(timeout=5)
 server.shutdown()
 print("PASS: modifier hold and release, third-key cancellation, caret preedit and single text commit over IBus")
